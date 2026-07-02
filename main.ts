@@ -1,13 +1,3 @@
-const getInput = async (returnInt: boolean = false) => {
-  // take bytestring then decode to string
-  const buf = new Uint8Array(64);
-  const choice = await Deno.stdin.read(buf) as number;
-  const result = new TextDecoder().decode(buf.subarray(0, choice));
-
-  if (returnInt) return +result;
-  return result;
-};
-
 const licenseList = [
   "agpl-3.0",
   "apache-2.0",
@@ -26,37 +16,38 @@ const licenseList = [
   "wtfpl",
 ];
 
-// printing stuff
 console.log("Pick your license");
-for (let i = 0; i < licenseList.length; i++) {
-  console.log(`${i + 1}. ${licenseList[i]}`);
-}
+licenseList.forEach((license, index) => {
+  console.log(`${index + 1}. ${license}`);
+});
 
-// take license choice
-let text = new TextEncoder().encode("Your choice: ");
-Deno.writeAll(Deno.stdout, text);
-let licenseChoice = await getInput(true) as number;
-if (isNaN(licenseChoice) || licenseChoice <= 0 || licenseChoice >= 15) {
-  console.log('\n===')
+// 1. 使用标准内置的 prompt()，它会自动把提示语打印出来并等待用户输入，简单安全
+const choiceInput = prompt("Your choice:");
+let licenseChoice = Number(choiceInput?.trim());
+
+if (isNaN(licenseChoice) || licenseChoice <= 0 || licenseChoice > licenseList.length) {
+  console.log('\n===');
   console.log('Invalid input! Defaulting to MIT license');
-  console.log('===\n')
-  licenseChoice = 12; //defaults to mit
+  console.log('===\n');
+  licenseChoice = 12; // 默认 mit
 }
-const license = licenseList[licenseChoice-1] as string;
+const license = licenseList[licenseChoice - 1];
 
-// take author name
-text = new TextEncoder().encode("Your name: ");
-Deno.writeAll(Deno.stdout, text);
-const authorName = await getInput() as string;
+// 2. 再次使用 prompt 获取作者名字
+const authorName = prompt("Your name:")?.trim() || "Unknown";
 
-const currentYear = new Date().getFullYear().toString() as string;
-const licenseLink =
-  `https://raw.githubusercontent.com/nishanths/license/master/.templates/${license}.tmpl` as string;
+const currentYear = new Date().getFullYear().toString();
+const licenseLink = `https://raw.githubusercontent.com/nishanths/license/master/.templates/${license}.tmpl`;
 
 const response = await fetch(licenseLink);
-let data = await response.text() as string;
+if (!response.ok) {
+  console.error(`Failed to fetch license template: ${response.statusText}`);
+  Deno.exit(1);
+}
+let data = await response.text();
 
-data = data.replace('{{.Year}}', currentYear);
-data = data.replace('{{.Name}}', authorName);
+data = data.replaceAll('{{.Year}}', currentYear);
+data = data.replaceAll('{{.Name}}', authorName);
 
 Deno.writeTextFileSync('./LICENSE', data);
+console.log("✓ LICENSE file generated successfully!");
